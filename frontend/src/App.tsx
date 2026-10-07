@@ -1,1 +1,230 @@
-import { useEffect, useRef, useState } from "react"; import { checkBackend, sendMessage } from "./services/api"; import "./App.css"; interface Message { id: number; role: "user" | "assistant"; content: string; } function App() { const [backendStatus, setBackendStatus] = useState< "checking" | "online" | "offline" >("checking"); const [messages, setMessages] = useState<Message[]>([]); const [input, setInput] = useState(""); const [isSending, setIsSending] = useState(false); const messagesEndRef = useRef<HTMLDivElement | null>(null); useEffect(() => { checkBackend() .then(() => setBackendStatus("online")) .catch(() => setBackendStatus("offline")); }, []); useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth", }); }, [messages]); async function handleSendMessage() { const message = input.trim(); if (!message || isSending) { return; } const userMessage: Message = { id: Date.now(), role: "user", content: message, }; setMessages((current) => [...current, userMessage]); setInput(""); setIsSending(true); try { const response = await sendMessage(message); const assistantMessage: Message = { id: Date.now() + 1, role: "assistant", content: response.reply, }; setMessages((current) => [...current, assistantMessage]); } catch { const errorMessage: Message = { id: Date.now() + 1, role: "assistant", content: "No he podido comunicarme con el servidor. Comprueba que el backend esté funcionando.", }; setMessages((current) => [...current, errorMessage]); } finally { setIsSending(false); } } function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) { if (event.key === "Enter") { event.preventDefault(); handleSendMessage(); } } return ( <div className="app"> <header className="app-header"> <div> <h1>Parsenia</h1> <p>AI Image Creation & Editing</p> </div> <div className={`status status-${backendStatus}`}> <span className="status-dot" /> {backendStatus === "checking" && "Conectando..."} {backendStatus === "online" && "API conectada"} {backendStatus === "offline" && "API desconectada"} </div> </header> <main className="workspace"> <section className="chat-panel"> <div className="panel-header"> <h2>Conversación</h2> </div> <div className="messages"> {messages.length === 0 ? ( <div className="welcome-message"> <h2>Bienvenido a Parsenia</h2> <p> Describe la imagen que quieres crear o sube una imagen para comenzar a editarla. </p> </div> ) : ( messages.map((message) => ( <div key={message.id} className={`message message-${message.role}`} > <strong> {message.role === "user" ? "Tú" : "Parsenia"} </strong> <p>{message.content}</p> </div> )) )} {isSending && ( <div className="message message-assistant"> <strong>Parsenia</strong> <p>Escribiendo...</p> </div> )} <div ref={messagesEndRef} /> </div> <div className="composer"> <button className="attach-button" type="button"> + </button> <input type="text" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} placeholder="Describe lo que quieres crear..." disabled={isSending} /> <button className="send-button" type="button" onClick={handleSendMessage} disabled={isSending || !input.trim()} > ↑ </button> </div> </section> <section className="canvas-panel"> <div className="panel-header"> <h2>Resultado</h2> </div> <div className="image-placeholder"> <div> <span className="placeholder-icon">✦</span> <p>Tu imagen aparecerá aquí</p> </div> </div> </section> </main> </div> ); } export default App;
+import { useEffect, useRef, useState } from "react";
+import {
+  checkBackend,
+  sendMessage,
+  type ChatMessage,
+} from "./services/api";
+import "./App.css";
+
+interface Message {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+}
+
+function App() {
+  const [backendStatus, setBackendStatus] = useState<
+    "checking" | "online" | "offline"
+  >("checking");
+
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const savedMessages = localStorage.getItem("parsenia-messages");
+
+    if (!savedMessages) {
+      return [];
+    }
+
+    try {
+      return JSON.parse(savedMessages);
+    } catch {
+      return [];
+    }
+  });
+
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    checkBackend()
+      .then(() => setBackendStatus("online"))
+      .catch(() => setBackendStatus("offline"));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "parsenia-messages",
+      JSON.stringify(messages),
+    );
+  }, [messages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages]);
+
+  async function handleSendMessage() {
+    const message = input.trim();
+
+    if (!message || isSending) {
+      return;
+    }
+
+    const userMessage: Message = {
+      id: Date.now(),
+      role: "user",
+      content: message,
+    };
+
+    setMessages((current) => [...current, userMessage]);
+    setInput("");
+    setIsSending(true);
+
+    try {
+      const currentMessages: ChatMessage[] = [
+        ...messages.map((item) => ({
+          role: item.role,
+          content: item.content,
+        })),
+        {
+          role: "user",
+          content: message,
+        },
+      ];
+
+      const response = await sendMessage(currentMessages);
+
+      const assistantMessage: Message = {
+        id: Date.now() + 1,
+        role: "assistant",
+        content: response.reply,
+      };
+
+      setMessages((current) => [...current, assistantMessage]);
+    } catch {
+      const errorMessage: Message = {
+        id: Date.now() + 1,
+        role: "assistant",
+        content:
+          "No he podido comunicarme con el servidor. Comprueba que el backend esté funcionando.",
+      };
+
+      setMessages((current) => [...current, errorMessage]);
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleSendMessage();
+    }
+  }
+
+  function handleNewConversation() {
+    setMessages([]);
+    localStorage.removeItem("parsenia-messages");
+  }
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div>
+          <h1>Parsenia</h1>
+          <p>AI Image Creation & Editing</p>
+        </div>
+
+        <div className={`status status-${backendStatus}`}>
+          <span className="status-dot" />
+
+          {backendStatus === "checking" && "Conectando..."}
+          {backendStatus === "online" && "API conectada"}
+          {backendStatus === "offline" && "API desconectada"}
+        </div>
+      </header>
+
+      <main className="workspace">
+        <section className="chat-panel">
+          <div className="panel-header">
+            <h2>Conversación</h2>
+
+            <button
+              className="clear-chat-button"
+              type="button"
+              onClick={handleNewConversation}
+            >
+              Nueva conversación
+            </button>
+          </div>
+
+          <div className="messages">
+            {messages.length === 0 ? (
+              <div className="welcome-message">
+                <h2>Bienvenido a Parsenia</h2>
+
+                <p>
+                  Describe la imagen que quieres crear o sube una imagen para
+                  comenzar a editarla.
+                </p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`message message-${message.role}`}
+                >
+                  <strong>
+                    {message.role === "user" ? "Tú" : "Parsenia"}
+                  </strong>
+
+                  <p>{message.content}</p>
+                </div>
+              ))
+            )}
+
+            {isSending && (
+              <div className="message message-assistant">
+                <strong>Parsenia</strong>
+                <p>Escribiendo...</p>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="composer">
+            <button className="attach-button" type="button">
+              +
+            </button>
+
+            <input
+              type="text"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe lo que quieres crear..."
+              disabled={isSending}
+            />
+
+            <button
+              className="send-button"
+              type="button"
+              onClick={handleSendMessage}
+              disabled={isSending || !input.trim()}
+            >
+              ↑
+            </button>
+          </div>
+        </section>
+
+        <section className="canvas-panel">
+          <div className="panel-header">
+            <h2>Resultado</h2>
+          </div>
+
+          <div className="image-placeholder">
+            <div>
+              <span className="placeholder-icon">✦</span>
+              <p>Tu imagen aparecerá aquí</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+export default App;

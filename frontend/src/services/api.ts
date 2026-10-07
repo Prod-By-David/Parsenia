@@ -4,9 +4,15 @@ export interface HealthResponse {
   status: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface ChatResponse {
   success: boolean;
   reply: string;
+  message_count: number;
 }
 
 export async function checkBackend(): Promise<HealthResponse> {
@@ -20,7 +26,7 @@ export async function checkBackend(): Promise<HealthResponse> {
 }
 
 export async function sendMessage(
-  message: string,
+  messages: ChatMessage[],
 ): Promise<ChatResponse> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
@@ -28,7 +34,7 @@ export async function sendMessage(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      message,
+      messages,
     }),
   });
 

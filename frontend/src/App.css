@@ -255,3 +255,19 @@ button {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.clear-chat-button {
+  border: 1px solid #2d2d35;
+  background: #18181c;
+  color: #a7a7b0;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.clear-chat-button:hover {
+  background: #24242a;
+  color: #ffffff;
+}
