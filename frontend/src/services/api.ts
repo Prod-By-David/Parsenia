@@ -13,6 +13,9 @@ export interface ChatResponse {
   success: boolean;
   reply: string;
   message_count: number;
+  image_url?: string;
+  seed?: number | string;
+  details?: unknown;
 }
 
 export async function checkBackend(): Promise<HealthResponse> {
@@ -39,7 +42,19 @@ export async function sendMessage(
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo enviar el mensaje");
+    let errorMessage = "No se pudo generar la imagen";
+
+    try {
+      const errorData = await response.json();
+
+      if (typeof errorData.detail === "string") {
+        errorMessage = errorData.detail;
+      }
+    } catch {
+      // Conservamos el mensaje de error predeterminado.
+    }
+
+    throw new Error(errorMessage);
   }
 
   return response.json();

@@ -1,10 +1,10 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.chat import router as chat_router
 from app.api.projects import router as projects_router
 from app.api.images import router as images_router
+from app.api.generated import router as generated_router
 
 app = FastAPI(
     title="Parsenia API",
@@ -23,6 +23,7 @@ app.add_middleware(
 app.include_router(chat_router)
 app.include_router(projects_router)
 app.include_router(images_router)
+app.include_router(generated_router)
 
 
 @app.get("/")
