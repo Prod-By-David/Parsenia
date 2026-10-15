@@ -40,6 +40,7 @@ function App() {
     null,
   );
   const [messages, setMessages] = useState<ProjectMessage[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ProjectImage[]>([]);
 
   const [projectName, setProjectName] = useState("");
@@ -348,6 +349,13 @@ function App() {
       );
 
       setMessages((current) => [...current, assistantMessage]);
+
+      if (response.image_url) {
+        setGeneratedImages((current) => ({
+          ...current,
+          [String(assistantMessage.id)]: response.image_url!,
+        }));
+      }
     } catch {
       setError(
         "No se ha podido completar el mensaje. Comprueba la conexión con el servidor.",
@@ -425,11 +433,10 @@ function App() {
               projects.map((project) => (
                 <div
                   key={project.id}
-                  className={`project-item ${
-                    selectedProjectId === project.id
+                  className={`project-item ${selectedProjectId === project.id
                       ? "project-item-selected"
                       : ""
-                  }`}
+                    }`}
                 >
                   <button
                     type="button"
@@ -523,7 +530,17 @@ function App() {
                           <strong>
                             {message.role === "user" ? "Tú" : "Parsenia"}
                           </strong>
+
                           <p>{message.content}</p>
+
+                          {generatedImages[String(message.id)] && (
+                            <img
+                              className="generated-image"
+                              src={generatedImages[String(message.id)]}
+                              alt="Imagen generada por Parsenia"
+                              loading="lazy"
+                            />
+                          )}
                         </div>
                       ))
                     )}

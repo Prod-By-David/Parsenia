@@ -445,3 +445,13 @@ button {
     padding: 16px;
   }
 }
+
+.generated-image {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  margin-top: 12px;
+  border-radius: 12px;
+  object-fit: contain;
+}
