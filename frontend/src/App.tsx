@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   createProject,
@@ -115,6 +114,8 @@ function App() {
       return;
     }
 
+    // Tras comprobar que no es null, projectId queda tipado como string.
+    const projectId = selectedProjectId;
     let cancelled = false;
 
     async function loadMessages() {
@@ -123,7 +124,7 @@ function App() {
       setError("");
 
       try {
-        const data = await getProjectMessages(selectedProjectId);
+        const data = await getProjectMessages(projectId);
 
         if (!cancelled) {
           setMessages(data);
@@ -154,6 +155,8 @@ function App() {
       return;
     }
 
+    // Tras comprobar que no es null, projectId queda tipado como string.
+    const projectId = selectedProjectId;
     let cancelled = false;
 
     async function loadImages() {
@@ -161,7 +164,7 @@ function App() {
       setIsLoadingImages(true);
 
       try {
-        const data = await getProjectImages(selectedProjectId);
+        const data = await getProjectImages(projectId);
 
         if (!cancelled) {
           setImages(data);
