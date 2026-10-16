@@ -123,7 +123,7 @@ async def chat(data: ChatRequest):
             status_code=502,
             detail=(
                 "No se pudo generar la imagen. "
-                "Comprueba que el espacio de Qwen esté disponible "
+                "Comprueba que el servicio de generación esté disponible "
                 "e inténtalo de nuevo."
             ),
         ) from error
