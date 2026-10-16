@@ -98,3 +98,28 @@ def generate_image(
         "seed": result[2],
         "details": result[3],
     }
+
+def enhance_prompt(user_prompt: str) -> str:
+    """
+    Enriquece automáticamente el prompt del usuario con modificadores 
+    de calidad profesional de gama alta (estilo Midjourney / Flux / OpenAI).
+    """
+    base_prompt = user_prompt.strip()
+    
+    # Modificadores estándar de alta fidelidad
+    high_end_modifiers = (
+        "masterpiece, highly detailed, 8k resolution, photorealistic, "
+        "cinematic volumetric lighting, sharp focus, professional color grading"
+    )
+    
+    # Si el usuario busca algo específico de diseño o arte, adaptamos el sufijo
+    if "logo" in base_prompt.lower() or "minimalista" in base_prompt.lower():
+        return f"{base_prompt}, minimalist vector graphic, clean lines, flat design, professional branding, 8k"
+    
+    return f"{base_prompt}, {high_end_modifiers}"
+
+def generate_image(prompt: str, mode: str = "Create an image", steps: int = 25):
+    # 1. Mejoramos el prompt automáticamente
+    enhanced = enhance_prompt(prompt)
+    print(f"\n[Prompt Original]: {prompt}")
+    print(f"[Prompt Mejorado]: {enhanced}\n")

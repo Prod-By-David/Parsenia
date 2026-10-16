@@ -469,11 +469,10 @@ function App() {
               projects.map((project) => (
                 <div
                   key={project.id}
-                  className={`project-item ${
-                    selectedProjectId === project.id
+                  className={`project-item ${selectedProjectId === project.id
                       ? "project-item-selected"
                       : ""
-                  }`}
+                    }`}
                 >
                   <button
                     type="button"
@@ -544,9 +543,10 @@ function App() {
                 <section className="chat-panel">
                   <div className="messages">
                     {isLoadingMessages ? (
-                      <p className="projects-empty">
-                        Cargando conversación...
-                      </p>
+                      <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                        <div className="skeleton skeleton-text" />
+                        <div className="skeleton skeleton-text skeleton-text-short" />
+                      </div>
                     ) : messages.length === 0 ? (
                       <div className="welcome-message">
                         <div className="welcome-header">
@@ -560,20 +560,20 @@ function App() {
                         </div>
 
                         <div className="suggestions-grid">
-                          <div 
-                            className="suggestion-card" 
+                          <div
+                            className="suggestion-card"
                             onClick={() => setInput("Un astronauta explorando un planeta alienígena con cristales brillantes, estilo fotorrealista")}
                           >
                             Un astronauta explorando un planeta alienígena con cristales brillantes, estilo fotorrealista
                           </div>
-                          <div 
-                            className="suggestion-card" 
+                          <div
+                            className="suggestion-card"
                             onClick={() => setInput("Diseña un logotipo minimalista para una cafetería futurista con tonos neón")}
                           >
                             Diseña un logotipo minimalista para una cafetería futurista con tonos neón
                           </div>
-                          <div 
-                            className="suggestion-card" 
+                          <div
+                            className="suggestion-card"
                             onClick={() => setInput("Un paisaje montañoso nevado al atardecer reflejado en un lago cristalino")}
                           >
                             Un paisaje montañoso nevado al atardecer reflejado en un lago cristalino
@@ -715,9 +715,10 @@ function App() {
 
                   <div className="project-image-gallery">
                     {isLoadingImages ? (
-                      <p className="projects-empty">
-                        Cargando imágenes...
-                      </p>
+                      <div className="project-image-gallery">
+                        <div className="skeleton skeleton-card" />
+                        <div className="skeleton skeleton-card" />
+                      </div>
                     ) : images.length === 0 ? (
                       <div className="image-placeholder">
                         <div>
