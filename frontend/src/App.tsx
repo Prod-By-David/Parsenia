@@ -542,10 +542,6 @@ function App() {
 
               <div className="workspace">
                 <section className="chat-panel">
-                  <div className="panel-header">
-                    <h2>Conversación</h2>
-                  </div>
-
                   <div className="messages">
                     {isLoadingMessages ? (
                       <p className="projects-empty">
@@ -553,11 +549,36 @@ function App() {
                       </p>
                     ) : messages.length === 0 ? (
                       <div className="welcome-message">
-                        <h2>Empecemos a crear</h2>
-                        <p>
-                          Describe la imagen que quieres generar o editar.
-                          Puedes adjuntar una imagen de referencia abajo o editar una existente desde la galería.
-                        </p>
+                        <div className="welcome-header">
+                          <h2>
+                            Hello <span className="gradient-text">there</span>,<br />
+                            How <span className="gradient-text">can I help you?</span>
+                          </h2>
+                          <p>
+                            Use one of the most common prompts below or use one of your own prompt to begin
+                          </p>
+                        </div>
+
+                        <div className="suggestions-grid">
+                          <div 
+                            className="suggestion-card" 
+                            onClick={() => setInput("Un astronauta explorando un planeta alienígena con cristales brillantes, estilo fotorrealista")}
+                          >
+                            Un astronauta explorando un planeta alienígena con cristales brillantes, estilo fotorrealista
+                          </div>
+                          <div 
+                            className="suggestion-card" 
+                            onClick={() => setInput("Diseña un logotipo minimalista para una cafetería futurista con tonos neón")}
+                          >
+                            Diseña un logotipo minimalista para una cafetería futurista con tonos neón
+                          </div>
+                          <div 
+                            className="suggestion-card" 
+                            onClick={() => setInput("Un paisaje montañoso nevado al atardecer reflejado en un lago cristalino")}
+                          >
+                            Un paisaje montañoso nevado al atardecer reflejado en un lago cristalino
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       messages.map((message) => (
@@ -639,62 +660,7 @@ function App() {
                     </div>
                   )}
 
-                  <div className="image-upload-controls">
-                    <label
-                      className="attach-image-button"
-                      htmlFor="project-image-input"
-                    >
-                      {isUploadingImage ? "Subiendo..." : "＋ Adjuntar imagen"}
-                    </label>
-
-                    <input
-                      id="project-image-input"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      onChange={handleSelectImage}
-                      disabled={
-                        isUploadingImage ||
-                        backendStatus !== "online"
-                      }
-                    />
-
-                    {selectedFile && (
-                      <button
-                        type="button"
-                        onClick={() => void handleUploadImage()}
-                        disabled={
-                          isUploadingImage ||
-                          backendStatus !== "online"
-                        }
-                      >
-                        {isUploadingImage ? "Subiendo..." : "Subir al proyecto"}
-                      </button>
-                    )}
-                  </div>
-
                   <div className="composer">
-                    {selectedFile && (
-                      <div className="selected-image-preview">
-                        {previewUrl && <img src={previewUrl} alt="Vista previa" />}
-                        <div className="selected-image-info">
-                          <span>{selectedFile.name}</span>
-                          <small>{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</small>
-                        </div>
-                        <button type="button" onClick={() => setSelectedFile(null)} disabled={isUploadingImage}>×</button>
-                      </div>
-                    )}
-
-                    {editingImage && (
-                      <div className="selected-image-preview editing-banner">
-                        <img src={editingImage.url} alt="Editar" />
-                        <div className="selected-image-info">
-                          <span>Editando: {editingImage.filename}</span>
-                          <small>Describe los cambios</small>
-                        </div>
-                        <button type="button" onClick={() => setEditingImage(null)} disabled={isSending}>×</button>
-                      </div>
-                    )}
-
                     <div className="composer-inner">
                       <div className="composer-row">
                         <div className="image-upload-controls">
@@ -737,18 +703,6 @@ function App() {
                           ↑
                         </button>
                       </div>
-                    </div>
-                  </div>
-
-                      <button
-                        className="send-button"
-                        type="button"
-                        onClick={() => void handleSendMessage()}
-                        disabled={isSending || isLoadingMessages || isUploadingImage || !input.trim() || backendStatus !== "online"}
-                        title="Enviar"
-                      >
-                        ↑
-                      </button>
                     </div>
                   </div>
                 </section>
