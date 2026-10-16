@@ -673,38 +673,83 @@ function App() {
                   </div>
 
                   <div className="composer">
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={(event) => setInput(event.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={
-                        editingImage
-                          ? "Describe los cambios para editar la imagen..."
-                          : "Describe lo que quieres crear..."
-                      }
-                      disabled={
-                        isSending ||
-                        isLoadingMessages ||
-                        isUploadingImage ||
-                        backendStatus !== "online"
-                      }
-                    />
+                    {selectedFile && (
+                      <div className="selected-image-preview">
+                        {previewUrl && <img src={previewUrl} alt="Vista previa" />}
+                        <div className="selected-image-info">
+                          <span>{selectedFile.name}</span>
+                          <small>{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</small>
+                        </div>
+                        <button type="button" onClick={() => setSelectedFile(null)} disabled={isUploadingImage}>×</button>
+                      </div>
+                    )}
 
-                    <button
-                      className="send-button"
-                      type="button"
-                      onClick={() => void handleSendMessage()}
-                      disabled={
-                        isSending ||
-                        isLoadingMessages ||
-                        isUploadingImage ||
-                        !input.trim() ||
-                        backendStatus !== "online"
-                      }
-                    >
-                      ↑
-                    </button>
+                    {editingImage && (
+                      <div className="selected-image-preview editing-banner">
+                        <img src={editingImage.url} alt="Editar" />
+                        <div className="selected-image-info">
+                          <span>Editando: {editingImage.filename}</span>
+                          <small>Describe los cambios</small>
+                        </div>
+                        <button type="button" onClick={() => setEditingImage(null)} disabled={isSending}>×</button>
+                      </div>
+                    )}
+
+                    <div className="composer-inner">
+                      <div className="composer-row">
+                        <div className="image-upload-controls">
+                          <label className="attach-image-button" htmlFor="project-image-input" title="Adjuntar imagen">
+                            📎
+                          </label>
+                          <input
+                            id="project-image-input"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            onChange={handleSelectImage}
+                            disabled={isUploadingImage || backendStatus !== "online"}
+                          />
+                        </div>
+
+                        <input
+                          type="text"
+                          value={input}
+                          onChange={(event) => setInput(event.target.value)}
+                          onKeyDown={handleKeyDown}
+                          placeholder={
+                            editingImage
+                              ? "Describe los cambios para editar la imagen..."
+                              : "Type your question here ..."
+                          }
+                          maxLength={4000}
+                          disabled={isSending || isLoadingMessages || isUploadingImage || backendStatus !== "online"}
+                        />
+                      </div>
+
+                      <div className="composer-footer">
+                        <span className="char-counter">{input.length}/4000</span>
+                        <button
+                          className="send-button"
+                          type="button"
+                          onClick={() => void handleSendMessage()}
+                          disabled={isSending || isLoadingMessages || isUploadingImage || !input.trim() || backendStatus !== "online"}
+                          title="Enviar"
+                        >
+                          ↑
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                      <button
+                        className="send-button"
+                        type="button"
+                        onClick={() => void handleSendMessage()}
+                        disabled={isSending || isLoadingMessages || isUploadingImage || !input.trim() || backendStatus !== "online"}
+                        title="Enviar"
+                      >
+                        ↑
+                      </button>
+                    </div>
                   </div>
                 </section>
 
