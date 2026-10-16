@@ -1,4 +1,3 @@
-
 const API_URL = "/api/projects";
 
 export interface ProjectImage {
@@ -19,6 +18,13 @@ interface ImagesResponse {
 interface UploadImageResponse {
   success: boolean;
   image: ProjectImage;
+}
+
+export interface EditImageResponse {
+  success: boolean;
+  image: ProjectImage;
+  seed: number;
+  details: string;
 }
 
 async function checkResponse<T>(response: Response): Promise<T> {
@@ -77,8 +83,30 @@ export async function uploadProjectImage(
 }
 
 /**
- * Construye la URL para mostrar la imagen.
+ * Edita una imagen existente utilizando una instrucción de texto.
  */
+export async function editProjectImage(
+  projectId: string,
+  referenceImageId: string,
+  prompt: string,
+): Promise<EditImageResponse> {
+  const response = await fetch(
+    `${API_URL}/${encodeURIComponent(projectId)}/images/edit`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reference_image_id: referenceImageId,
+        prompt: prompt,
+      }),
+    },
+  );
+
+  return checkResponse<EditImageResponse>(response);
+}
+
 export function getProjectImageUrl(
   projectId: string,
   imageId: string,

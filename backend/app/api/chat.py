@@ -1,6 +1,8 @@
-
+from datetime import datetime, timezone
 from pathlib import Path
 import shutil
+import sqlite3
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -8,6 +10,10 @@ from pydantic import BaseModel
 from app.services.image_generator import generate_image
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+DATABASE_PATH = BACKEND_DIR / "parsenia.db"
+UPLOADS_DIR = BACKEND_DIR / "storage" / "uploads"
 
 
 class Message(BaseModel):
@@ -17,6 +23,14 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[Message]
+    project_id: str | None = None
+
+
+def get_connection():
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
 
 
 @router.post("")
@@ -38,6 +52,7 @@ async def chat(data: ChatRequest):
     print("\n--- HISTORIAL RECIBIDO ---")
     for message in data.messages:
         print(f"{message.role}: {message.content}")
+    print(f"Project ID: {data.project_id}")
     print("--- FIN DEL HISTORIAL ---\n")
 
     try:
@@ -49,22 +64,54 @@ async def chat(data: ChatRequest):
 
         source_path = Path(result["image_path"])
 
-        # Guardamos una copia en el almacenamiento temporal del backend.
-        generated_dir = (
-            Path(__file__).resolve().parents[2]
-            / "storage"
-            / "generated"
-        )
-        generated_dir.mkdir(parents=True, exist_ok=True)
+        image_id = str(uuid4())
+        filename = f"{image_id}.png"
 
-        filename = f"{source_path.stem}.png"
-        destination = generated_dir / filename
-        shutil.copy2(source_path, destination)
+        # Si se proporciona project_id, guardamos y registramos en la BD del proyecto
+        if data.project_id:
+            project_dir = UPLOADS_DIR / data.project_id
+            project_dir.mkdir(parents=True, exist_ok=True)
+            destination = project_dir / filename
+            shutil.copy2(source_path, destination)
+
+            file_size = destination.stat().st_size
+            created_at = datetime.now(timezone.utc).isoformat()
+            original_filename = f"generated_{source_path.stem}.png"
+
+            with get_connection() as connection:
+                connection.execute(
+                    """
+                    INSERT INTO images (
+                        id, project_id, filename, content_type,
+                        file_path, size, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        image_id,
+                        data.project_id,
+                        original_filename,
+                        "image/png",
+                        str(destination),
+                        file_size,
+                        created_at,
+                    ),
+                )
+
+            image_url = f"/api/projects/{data.project_id}/images/{image_id}/file"
+        else:
+            # Fallback temporal si no se envía project_id
+            generated_dir = BACKEND_DIR / "storage" / "generated"
+            generated_dir.mkdir(parents=True, exist_ok=True)
+            destination = generated_dir / filename
+            shutil.copy2(source_path, destination)
+            image_url = f"/api/generated/{filename}"
 
         return {
             "success": True,
             "reply": "He generado una imagen a partir de tu descripción.",
-            "image_url": f"/api/generated/{filename}",
+            "image_url": image_url,
+            "image_id": image_id,
             "seed": result["seed"],
             "details": result["details"],
             "message_count": len(data.messages),

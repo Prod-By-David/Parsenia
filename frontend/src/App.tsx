@@ -16,6 +16,7 @@ import {
 import {
   getProjectImages,
   uploadProjectImage,
+  editProjectImage,
   type ProjectImage,
 } from "./services/images";
 import "./App.css";
@@ -46,6 +47,7 @@ function App() {
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [editingImage, setEditingImage] = useState<ProjectImage | null>(null);
 
   const [isCreating, setIsCreating] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -111,16 +113,17 @@ function App() {
     if (!selectedProjectId) {
       setMessages([]);
       setIsLoadingMessages(false);
+      setEditingImage(null);
       return;
     }
 
-    // Tras comprobar que no es null, projectId queda tipado como string.
     const projectId = selectedProjectId;
     let cancelled = false;
 
     async function loadMessages() {
       setIsLoadingMessages(true);
       setMessages([]);
+      setEditingImage(null);
       setError("");
 
       try {
@@ -155,7 +158,6 @@ function App() {
       return;
     }
 
-    // Tras comprobar que no es null, projectId queda tipado como string.
     const projectId = selectedProjectId;
     let cancelled = false;
 
@@ -203,6 +205,7 @@ function App() {
       setProjects((current) => [...current, project]);
       setProjectName("");
       setSelectedFile(null);
+      setEditingImage(null);
       setSelectedProjectId(project.id);
     } catch {
       setError("No se ha podido crear el proyecto.");
@@ -240,6 +243,7 @@ function App() {
 
       if (selectedProjectId === project.id) {
         setSelectedFile(null);
+        setEditingImage(null);
         setSelectedProjectId(remaining[0]?.id ?? null);
       }
     } catch {
@@ -249,8 +253,6 @@ function App() {
 
   function handleSelectImage(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-
-    // Permitir volver a seleccionar el mismo archivo.
     event.target.value = "";
 
     if (!file) {
@@ -290,7 +292,6 @@ function App() {
     try {
       const uploadedImage = await uploadProjectImage(projectId, file);
 
-      // Añadir la imagen subida a la galería del proyecto.
       setImages((current) => [...current, uploadedImage]);
       setSelectedFile(null);
     } catch (uploadError) {
@@ -323,45 +324,77 @@ function App() {
     setInput("");
 
     try {
-      const userMessage = await addProjectMessage(
-        projectId,
-        "user",
-        content,
-      );
+      if (editingImage) {
+        // Flujo de edición de imagen existente
+        const userMessage = await addProjectMessage(
+          projectId,
+          "user",
+          `Editar "${editingImage.filename}": ${content}`,
+        );
 
-      const updatedHistory: ProjectMessage[] = [
-        ...messages,
-        userMessage,
-      ];
+        setMessages((current) => [...current, userMessage]);
 
-      setMessages(updatedHistory);
+        const response = await editProjectImage(
+          projectId,
+          editingImage.id,
+          content,
+        );
 
-      const conversationForAI: ChatMessage[] = updatedHistory.map(
-        (message) => ({
-          role: message.role,
-          content: message.content,
-        }),
-      );
+        const assistantMessage = await addProjectMessage(
+          projectId,
+          "assistant",
+          `He editado la imagen a partir de tu instrucción.`,
+        );
 
-      const response = await sendMessage(conversationForAI);
-
-      const assistantMessage = await addProjectMessage(
-        projectId,
-        "assistant",
-        response.reply,
-      );
-
-      setMessages((current) => [...current, assistantMessage]);
-
-      if (response.image_url) {
+        setMessages((current) => [...current, assistantMessage]);
+        setImages((current) => [...current, response.image]);
         setGeneratedImages((current) => ({
           ...current,
-          [String(assistantMessage.id)]: response.image_url!,
+          [String(assistantMessage.id)]: response.image.url,
         }));
+        setEditingImage(null);
+      } else {
+        // Flujo normal de chat/creación
+        const userMessage = await addProjectMessage(
+          projectId,
+          "user",
+          content,
+        );
+
+        const updatedHistory: ProjectMessage[] = [
+          ...messages,
+          userMessage,
+        ];
+
+        setMessages(updatedHistory);
+
+        const conversationForAI: ChatMessage[] = updatedHistory.map(
+          (message) => ({
+            role: message.role,
+            content: message.content,
+          }),
+        );
+
+        const response = await sendMessage(conversationForAI);
+
+        const assistantMessage = await addProjectMessage(
+          projectId,
+          "assistant",
+          response.reply,
+        );
+
+        setMessages((current) => [...current, assistantMessage]);
+
+        if (response.image_url) {
+          setGeneratedImages((current) => ({
+            ...current,
+            [String(assistantMessage.id)]: response.image_url!,
+          }));
+        }
       }
     } catch {
       setError(
-        "No se ha podido completar el mensaje. Comprueba la conexión con el servidor.",
+        "No se ha podido completar la operación. Comprueba la conexión con el servidor.",
       );
     } finally {
       setIsSending(false);
@@ -436,10 +469,11 @@ function App() {
               projects.map((project) => (
                 <div
                   key={project.id}
-                  className={`project-item ${selectedProjectId === project.id
+                  className={`project-item ${
+                    selectedProjectId === project.id
                       ? "project-item-selected"
                       : ""
-                    }`}
+                  }`}
                 >
                   <button
                     type="button"
@@ -452,6 +486,7 @@ function App() {
                     }
                     onClick={() => {
                       setSelectedFile(null);
+                      setEditingImage(null);
                       setSelectedProjectId(project.id);
                     }}
                   >
@@ -521,7 +556,7 @@ function App() {
                         <h2>Empecemos a crear</h2>
                         <p>
                           Describe la imagen que quieres generar o editar.
-                          Puedes adjuntar una imagen de referencia abajo.
+                          Puedes adjuntar una imagen de referencia abajo o editar una existente desde la galería.
                         </p>
                       </div>
                     ) : (
@@ -551,7 +586,7 @@ function App() {
                     {isSending && (
                       <div className="message message-assistant">
                         <strong>Parsenia</strong>
-                        <p>Escribiendo...</p>
+                        <p>{editingImage ? "Editando imagen..." : "Escribiendo..."}</p>
                       </div>
                     )}
                   </div>
@@ -577,6 +612,27 @@ function App() {
                         onClick={() => setSelectedFile(null)}
                         disabled={isUploadingImage}
                         aria-label="Cancelar imagen seleccionada"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
+                  {editingImage && (
+                    <div className="selected-image-preview editing-banner">
+                      <img
+                        src={editingImage.url}
+                        alt="Imagen seleccionada para editar"
+                      />
+                      <div className="selected-image-info">
+                        <span>Editando: {editingImage.filename}</span>
+                        <small>Escribe qué cambios quieres aplicar</small>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingImage(null)}
+                        disabled={isSending}
+                        aria-label="Cancelar edición"
                       >
                         ×
                       </button>
@@ -622,7 +678,11 @@ function App() {
                       value={input}
                       onChange={(event) => setInput(event.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Describe lo que quieres crear..."
+                      placeholder={
+                        editingImage
+                          ? "Describe los cambios para editar la imagen..."
+                          : "Describe lo que quieres crear..."
+                      }
                       disabled={
                         isSending ||
                         isLoadingMessages ||
@@ -664,8 +724,7 @@ function App() {
                         <div>
                           <span className="placeholder-icon">✦</span>
                           <p>
-                            Todavía no hay imágenes. Adjunta una imagen para
-                            comenzar.
+                            Todavía no hay imágenes. Adjunta una imagen o genera una para comenzar.
                           </p>
                         </div>
                       </div>
@@ -688,10 +747,23 @@ function App() {
                             />
                           </a>
 
-                          <p title={image.filename}>{image.filename}</p>
-                          <small>
-                            {(image.size / (1024 * 1024)).toFixed(2)} MB
-                          </small>
+                          <div className="image-card-footer">
+                            <div className="image-card-meta">
+                              <p title={image.filename}>{image.filename}</p>
+                              <small>
+                                {(image.size / (1024 * 1024)).toFixed(2)} MB
+                              </small>
+                            </div>
+                            <button
+                              type="button"
+                              className="edit-image-action-btn"
+                              onClick={() => setEditingImage(image)}
+                              disabled={isSending}
+                              title="Editar esta imagen"
+                            >
+                              Editar
+                            </button>
+                          </div>
                         </article>
                       ))
                     )}

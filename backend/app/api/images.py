@@ -1,11 +1,14 @@
-
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+import shutil
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+from app.services.image_generator import generate_image
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/images",
@@ -24,6 +27,11 @@ ALLOWED_TYPES = {
     "image/webp": ".webp",
     "image/gif": ".gif",
 }
+
+
+class ImageEditRequest(BaseModel):
+    reference_image_id: str
+    prompt: str
 
 
 def get_connection():
@@ -202,6 +210,114 @@ async def upload_project_image(
     )
 
     return {"success": True, "image": image}
+
+
+@router.post("/edit")
+async def edit_project_image(
+    project_id: str,
+    data: ImageEditRequest,
+):
+    if not project_exists(project_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Proyecto no encontrado.",
+        )
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT file_path
+            FROM images
+            WHERE id = ? AND project_id = ?
+            """,
+            (data.reference_image_id, project_id),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Imagen de referencia no encontrada en este proyecto.",
+        )
+
+    reference_path = row["file_path"]
+
+    if not Path(reference_path).is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="El archivo de la imagen de referencia no está disponible en el servidor.",
+        )
+
+    try:
+        result = generate_image(
+            prompt=data.prompt,
+            mode="Edit an image",
+            reference_path=reference_path,
+            steps=20,
+        )
+
+        source_path = Path(result["image_path"])
+
+        image_id = str(uuid4())
+        filename = f"{image_id}.png"
+
+        project_dir = UPLOADS_DIR / project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+        destination = project_dir / filename
+        shutil.copy2(source_path, destination)
+
+        file_size = destination.stat().st_size
+        created_at = datetime.now(timezone.utc).isoformat()
+        original_filename = f"edited_{source_path.stem}.png"
+
+        with get_connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO images (
+                    id, project_id, filename, content_type,
+                    file_path, size, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    image_id,
+                    project_id,
+                    original_filename,
+                    "image/png",
+                    str(destination),
+                    file_size,
+                    created_at,
+                ),
+            )
+
+        image_url = f"/api/projects/{project_id}/images/{image_id}/file"
+
+        image_data = {
+            "id": image_id,
+            "project_id": project_id,
+            "filename": original_filename,
+            "content_type": "image/png",
+            "size": file_size,
+            "created_at": created_at,
+            "url": image_url,
+        }
+
+        return {
+            "success": True,
+            "image": image_data,
+            "seed": result["seed"],
+            "details": result["details"],
+        }
+
+    except Exception as error:
+        print(f"Error editando imagen: {type(error).__name__}: {error}")
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "No se pudo editar la imagen. "
+                "Comprueba que el espacio de Qwen esté disponible "
+                "e inténtalo de nuevo."
+            ),
+        ) from error
 
 
 @router.get("/{image_id}/file")
