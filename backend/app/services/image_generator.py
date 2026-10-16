@@ -1,29 +1,53 @@
-
 import os
 import tempfile
+import re
 from pathlib import Path
 
 from gradio_client import Client, handle_file
 
-
 SPACE_ID = "devalenya/qwen-image-2-1-studio"
 
+def enhance_prompt(user_prompt: str) -> str:
+    """
+    Enriquece automáticamente el prompt del usuario con modificadores 
+    de calidad profesional de gama alta (estilo Midjourney / Flux / OpenAI).
+    """
+    base_prompt = user_prompt.strip()
+    
+    # Modificadores estándar de alta fidelidad
+    high_end_modifiers = (
+        "masterpiece, highly detailed, 8k resolution, photorealistic, "
+        "cinematic volumetric lighting, sharp focus, professional color grading"
+    )
+    
+    if "logo" in base_prompt.lower() or "minimalista" in base_prompt.lower():
+        return f"{base_prompt}, minimalist vector graphic, clean lines, flat design, professional branding, 8k"
+    
+    return f"{base_prompt}, {high_end_modifiers}"
+
+def parse_aspect_ratio(aspect_ratio_input: str) -> str:
+    """
+    Mapea los formatos cortos o del frontend al formato exacto que espera Gradio.
+    """
+    if "16:9" in aspect_ratio_input:
+        return "Landscape · 16:9"
+    if "9:16" in aspect_ratio_input:
+        return "Portrait · 9:16"
+    return "Square · 1:1"
 
 def generate_image(
     prompt: str,
     mode: str = "Create an image",
     reference_path: str | None = None,
     aspect_ratio: str = "Square · 1:1",
-    steps: int = 20,
+    steps: int = 25,
     seed: int = 42,
     randomize_seed: bool = True,
 ) -> dict:
     """
     Genera o edita una imagen usando el espacio público de Qwen.
-
-    Devuelve la ruta temporal de la imagen y los detalles de generación.
+    Integra el enriquecimiento de prompts y el parseo de aspect ratio.
     """
-
     prompt = prompt.strip()
 
     if not prompt:
@@ -42,6 +66,21 @@ def generate_image(
     if reference_path and not Path(reference_path).is_file():
         raise ValueError("No se encuentra la imagen de referencia.")
 
+    # 1. Limpiar la etiqueta --ar si viniera en el texto y extraer el ratio
+    ar_match = re.search(r"--ar\s+(\d+:\d+|\S+)", prompt)
+    if ar_match:
+        clean_user_prompt = re.sub(r"--ar\s+\S+", "", prompt).strip()
+        aspect_ratio = parse_aspect_ratio(ar_match.group(1))
+    else:
+        clean_user_prompt = prompt
+        aspect_ratio = parse_aspect_ratio(aspect_ratio)
+
+    # 2. Aplicar ingeniería de prompts automática
+    enhanced_prompt = enhance_prompt(clean_user_prompt)
+    print(f"\n[Prompt Original]: {prompt}")
+    print(f"[Prompt Mejorado]: {enhanced_prompt}")
+    print(f"[Aspect Ratio]: {aspect_ratio}\n")
+
     token = os.getenv("HF_TOKEN")
 
     client = Client(
@@ -56,7 +95,7 @@ def generate_image(
     )
 
     result = client.predict(
-        prompt=prompt,
+        prompt=enhanced_prompt,
         mode=mode,
         reference=reference,
         aspect_ratio=aspect_ratio,
@@ -78,8 +117,7 @@ def generate_image(
             "El modelo no devolvió un archivo de imagen disponible."
         )
 
-    # Copiar el resultado a una ruta temporal propia para no depender
-    # de que el cliente elimine o cambie su archivo temporal.
+    # Copiar el resultado a una ruta temporal propia
     with tempfile.NamedTemporaryFile(
         prefix="parsenia_",
         suffix=".png",
@@ -98,28 +136,3 @@ def generate_image(
         "seed": result[2],
         "details": result[3],
     }
-
-def enhance_prompt(user_prompt: str) -> str:
-    """
-    Enriquece automáticamente el prompt del usuario con modificadores 
-    de calidad profesional de gama alta (estilo Midjourney / Flux / OpenAI).
-    """
-    base_prompt = user_prompt.strip()
-    
-    # Modificadores estándar de alta fidelidad
-    high_end_modifiers = (
-        "masterpiece, highly detailed, 8k resolution, photorealistic, "
-        "cinematic volumetric lighting, sharp focus, professional color grading"
-    )
-    
-    # Si el usuario busca algo específico de diseño o arte, adaptamos el sufijo
-    if "logo" in base_prompt.lower() or "minimalista" in base_prompt.lower():
-        return f"{base_prompt}, minimalist vector graphic, clean lines, flat design, professional branding, 8k"
-    
-    return f"{base_prompt}, {high_end_modifiers}"
-
-def generate_image(prompt: str, mode: str = "Create an image", steps: int = 25):
-    # 1. Mejoramos el prompt automáticamente
-    enhanced = enhance_prompt(prompt)
-    print(f"\n[Prompt Original]: {prompt}")
-    print(f"[Prompt Mejorado]: {enhanced}\n")

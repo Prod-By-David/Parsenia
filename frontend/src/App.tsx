@@ -44,6 +44,8 @@ function App() {
   const [images, setImages] = useState<ProjectImage[]>([]);
 
   const [projectName, setProjectName] = useState("");
+  const [projectSearch, setProjectSearch] = useState(""); // NUEVO: Buscador de proyectos
+  const [aspectRatio, setAspectRatio] = useState("1:1"); // NUEVO: Aspect Ratio selector
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -58,6 +60,11 @@ function App() {
 
   const selectedProject =
     projects.find((project) => project.id === selectedProjectId) ?? null;
+
+  // Filtrar proyectos según la búsqueda
+  const filteredProjects = projects.filter((project) =>
+    project.name.toLowerCase().includes(projectSearch.toLowerCase())
+  );
 
   // Crear una vista previa local del archivo seleccionado.
   useEffect(() => {
@@ -251,6 +258,27 @@ function App() {
     }
   }
 
+  // NUEVO: Función para exportar/descargar resumen del proyecto
+  function handleExportProject() {
+    if (!selectedProject) return;
+
+    const content = `PROYECTO: ${selectedProject.name}\n` +
+      `----------------------------------------\n\n` +
+      `MENSAJES:\n` +
+      messages.map(m => `[${m.role.toUpperCase()}] ${m.content}`).join("\n\n") +
+      `\n\n----------------------------------------\n` +
+      `IMÁGENES (${images.length}):\n` +
+      images.map(img => `- ${img.filename}: ${img.url}`).join("\n");
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedProject.name.toLowerCase().replace(/\s+/g, "_")}_report.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleSelectImage(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -278,33 +306,6 @@ function App() {
     setSelectedFile(file);
   }
 
-  async function handleUploadImage() {
-    const projectId = selectedProjectId;
-    const file = selectedFile;
-
-    if (!projectId || !file || isUploadingImage) {
-      return;
-    }
-
-    setIsUploadingImage(true);
-    setError("");
-
-    try {
-      const uploadedImage = await uploadProjectImage(projectId, file);
-
-      setImages((current) => [...current, uploadedImage]);
-      setSelectedFile(null);
-    } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "No se ha podido subir la imagen.",
-      );
-    } finally {
-      setIsUploadingImage(false);
-    }
-  }
-
   async function handleSendMessage() {
     const content = input.trim();
     const projectId = selectedProjectId;
@@ -325,11 +326,10 @@ function App() {
 
     try {
       if (editingImage) {
-        // Flujo de edición de imagen existente
         const userMessage = await addProjectMessage(
           projectId,
           "user",
-          `Editar "${editingImage.filename}": ${content}`,
+          `Editar "${editingImage.filename}" [Formato: ${aspectRatio}]: ${content}`,
         );
 
         setMessages((current) => [...current, userMessage]);
@@ -354,11 +354,11 @@ function App() {
         }));
         setEditingImage(null);
       } else {
-        // Flujo normal de chat/creación
+        const promptWithAspect = `${content} --ar ${aspectRatio}`;
         const userMessage = await addProjectMessage(
           projectId,
           "user",
-          content,
+          promptWithAspect,
         );
 
         const updatedHistory: ProjectMessage[] = [
@@ -432,6 +432,25 @@ function App() {
             <h2>Mis proyectos</h2>
           </div>
 
+          {/* NUEVO: Barra de búsqueda de proyectos */}
+          <div style={{ padding: "0 16px 12px 16px" }}>
+            <input
+              type="text"
+              value={projectSearch}
+              onChange={(e) => setProjectSearch(e.target.value)}
+              placeholder="Buscar proyectos..."
+              style={{
+                width: "100%",
+                background: "var(--bg-base)",
+                border: "1px solid var(--border-color)",
+                borderRadius: "var(--radius-sm)",
+                padding: "8px 12px",
+                color: "var(--text-main)",
+                fontSize: "0.85rem",
+              }}
+            />
+          </div>
+
           <form
             className="new-project-form"
             onSubmit={(event) => {
@@ -456,23 +475,24 @@ function App() {
                 isUploadingImage
               }
             >
-              {isCreating ? "Creando..." : "+ Crear proyecto"}
+              {isCreating ? "Creando..." : "+ Crear"}
             </button>
           </form>
 
           <div className="projects-list">
-            {projects.length === 0 ? (
+            {filteredProjects.length === 0 ? (
               <p className="projects-empty">
-                Todavía no tienes proyectos. Crea el primero arriba.
+                {projects.length === 0 ? "Todavía no tienes proyectos." : "No se encontraron proyectos."}
               </p>
             ) : (
-              projects.map((project) => (
+              filteredProjects.map((project) => (
                 <div
                   key={project.id}
-                  className={`project-item ${selectedProjectId === project.id
+                  className={`project-item ${
+                    selectedProjectId === project.id
                       ? "project-item-selected"
                       : ""
-                    }`}
+                  }`}
                 >
                   <button
                     type="button"
@@ -692,7 +712,30 @@ function App() {
                       </div>
 
                       <div className="composer-footer">
-                        <span className="char-counter">{input.length}/4000</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span className="char-counter">{input.length}/4000</span>
+                          
+                          {/* NUEVO: Selector de Relación de Aspecto */}
+                          <select
+                            value={aspectRatio}
+                            onChange={(e) => setAspectRatio(e.target.value)}
+                            style={{
+                              background: "var(--bg-base)",
+                              border: "1px solid var(--border-color)",
+                              borderRadius: "var(--radius-sm)",
+                              color: "var(--text-muted)",
+                              fontSize: "0.75rem",
+                              padding: "2px 6px",
+                              cursor: "pointer",
+                            }}
+                            title="Relación de aspecto"
+                          >
+                            <option value="1:1">1:1 (Cuadrado)</option>
+                            <option value="16:9">16:9 (Paisaje)</option>
+                            <option value="9:16">9:16 (Retrato)</option>
+                          </select>
+                        </div>
+
                         <button
                           className="send-button"
                           type="button"
@@ -708,9 +751,31 @@ function App() {
                 </section>
 
                 <section className="canvas-panel">
-                  <div className="panel-header">
-                    <h2>Imágenes del proyecto</h2>
-                    <span>{images.length}</span>
+                  <div className="panel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <h2>Imágenes</h2>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{images.length} archivos</span>
+                    </div>
+
+                    {/* NUEVO: Botón de Exportación / Descarga masiva */}
+                    {images.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleExportProject}
+                        style={{
+                          background: "rgba(99, 102, 241, 0.1)",
+                          color: "#818cf8",
+                          border: "1px solid rgba(99, 102, 241, 0.2)",
+                          borderRadius: "var(--radius-sm)",
+                          padding: "4px 8px",
+                          fontSize: "0.75rem",
+                          cursor: "pointer",
+                        }}
+                        title="Exportar informe del proyecto"
+                      >
+                        ⬇ Exportar
+                      </button>
+                    )}
                   </div>
 
                   <div className="project-image-gallery">
