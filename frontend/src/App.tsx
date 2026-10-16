@@ -375,7 +375,7 @@ function App() {
           }),
         );
 
-        const response = await sendMessage(conversationForAI);
+        const response = await sendMessage(conversationForAI, projectId);
 
         const assistantMessage = await addProjectMessage(
           projectId,

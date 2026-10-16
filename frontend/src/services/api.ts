@@ -30,6 +30,7 @@ export async function checkBackend(): Promise<HealthResponse> {
 
 export async function sendMessage(
   messages: ChatMessage[],
+  projectId?: string,
 ): Promise<ChatResponse> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
@@ -38,6 +39,7 @@ export async function sendMessage(
     },
     body: JSON.stringify({
       messages,
+      project_id: projectId,
     }),
   });
 
